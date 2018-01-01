@@ -45,7 +45,9 @@ dataFrame = pd.read_csv('csvfiles/ibex35/ibex35.csv')
 dateAux = dataFrame['Date'].values
 dateTimeAux = np.zeros(dateAux.shape)
 
+	#date strings to numeric value
 for i, j in enumerate(dateAux):
+
 	dateTimeAux[i] = datetime.strptime(j, '%Y-%m-%d').timestamp()
     #Add the newly parsed column to the dataframe
 	#dataFrame['Timestamp'] = dateTimeAux
