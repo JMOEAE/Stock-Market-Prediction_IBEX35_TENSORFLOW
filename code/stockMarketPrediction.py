@@ -1,3 +1,5 @@
+# coding=utf-8
+
 ###########################################################################
 ############  Stock-Market-Prediction_IBEX35_TENSORFLOW ###################
 #######################################################################
@@ -17,41 +19,181 @@
 ###########################################################################
 
 # Import modules
+import tensorflow as tf 						# Tensorflow
+import numpy as np 								# Numpy arrays
+import os
+import math
+import pandas as pd 							# Read data from CSV file
+from datetime import datetime, timedelta 	
+import matplotlib.pyplot as plt 				# plot
+from sklearn.preprocessing import MinMaxScaler 	# Estimator
 
-# Tensorflow
-import tensorflow as tensorflow
 
-# Numpy arrays
-import numpy as np
+# Remove NaN,inf values
 
-# Read data from CSV file
-import pandas as pd
+def clean_dataset(df):
+    assert isinstance(df, pd.DataFrame), "df needs to be a pd.DataFrame"
+    df.dropna(inplace=True)
+    indices_to_keep = ~df.isin([np.nan, np.inf, -np.inf]).any(1)
+    return df[indices_to_keep].astype(np.float64)
 
-# Used to convert date string to numerical value
-from datetime import datetime, timedelta
 
-# Used to plot data
-import matplotlib.pyplot as mpl
+
+
+
+
+
+
+
+
+
+
+
 
 # Csv data
-
-dataFrame = pd.read_csv('csvfiles/ibex35/ibex35.csv')
-#data = pd.read_csv('csvfiles/ibex35/endesa.csv')
-#data = pd.read_csv('csvfiles/ibex35/bbva.csv')
-#data = pd.read_csv('csvfiles/ibex35/mapfre.csv')
+dataRaw = pd.read_csv('..\csvfiles/ibex35/ibex35.csv')
+#data = pd.read_csv('..\csvfiles/ibex35/endesa.csv')
+#data = pd.read_csv('..\csvfiles/ibex35/bbva.csv')
+#data = pd.read_csv('..\csvfiles/ibex35/mapfre.csv')
 
 # Parse data
 
-dateAux = dataFrame['Date'].values
-dateTimeAux = np.zeros(dateAux.shape)
+dateRawAux = dataRaw['Date'].values
+dateTimeAux = np.zeros(dateRawAux.shape)
 
 	#date strings to numeric value
-for i, j in enumerate(dateAux):
+for i, j in enumerate(dateRawAux):
 
 	dateTimeAux[i] = datetime.strptime(j, '%Y-%m-%d').timestamp()
     #Add the newly parsed column to the dataframe
-	#dataFrame['Timestamp'] = dateTimeAux
-    Timestamp = dateTimeAux
+	dataRaw['Timestamp'] = dateTimeAux
+	Timestamp = dateTimeAux
 
-#Remove any unused columns (axis = 1 specifies fields are columns)
-dataFrame = dataFrame.drop(['Date','Open','High','Low','Adj Close','Volume'],axis=1)
+# Remove undesired columns by columns
+dataFrame_redux = dataRaw.drop(['Date','Timestamp','Volume'],axis=1)
+#dataFrame_redux = dataRaw.drop(['Date','Timestamp','Open','High','Low','Adj Close','Volume'],axis=1)
+
+data = clean_dataset(dataFrame_redux)
+data = dataFrame_redux.values 	# te lo da como numpy
+
+print(np.any(np.isnan(data)))
+
+#data = data[~np.isnan(data)]
+#print(dataFrame)
+#print(dataFrame_redux)
+#print(Timestamp)
+print(data)
+
+# plot data
+plt.plot(data)
+plt.show()
+
+# dimensions of data [n,p]
+n = data.shape[0]
+p = data.shape[1]
+
+print(n)
+print(p)
+
+## Set training data
+
+train_start = 0
+train_end = int(np.floor(0.5*n))
+test_start = train_end + 1
+test_end = n
+data_train = data[np.arange(train_start, train_end), :]
+data_test = data[np.arange(test_start, test_end), :]
+
+plt.plot(data,'+',data_train,'r--',data_test,'bs')
+plt.show()
+
+print(data_train)
+
+# Scale data
+
+print(np.any(np.isnan(data_train)))  # meter bloque try catch
+
+scaler = MinMaxScaler(feature_range=(-1, 1))
+scaler.fit(data_train)
+data_train = scaler.transform(data_train)
+data_test = scaler.transform(data_test)
+
+print(data_train)
+
+# Build x and y
+X_train = data_train[:, 1:]
+y_train = data_train[:, 0]
+X_test = data_test[:, 1:]
+y_test = data_test[:, 0]
+
+
+print(data_train[:, 1:])
+print(data_train[:, 0])
+# Number of stocks in training data
+n_stocks = X_train.shape[1]
+
+plt.plot(data_train,'r--',data_test,'bs')
+plt.show()
+
+plt.plot(X_train,'r--',X_test,'bs')
+plt.show()
+
+plt.plot(y_train,'r--',y_test,'bs')
+plt.show()
+
+print(n_stocks)
+
+## Building the Artifitial Neural Network (ANN)
+
+# Neurons
+n_neurons_1 = 1024
+n_neurons_2 = int(n_neurons_1/2)  #512
+n_neurons_3 = int(n_neurons_2/2)  #256
+n_neurons_4 = int(n_neurons_3/2)  #128
+
+# Session
+ann = tf.InteractiveSession()
+
+# Placeholder
+x = tf.placeholder(dtype=tf.float32, shape=[None, n_stocks])
+y = tf.placeholder(dtype=tf.float32, shape=[None])
+
+# Initializers
+sigma = 1
+weight_initializer = tf.variance_scaling_initializer(mode="fan_avg", distribution="uniform", scale=sigma)
+bias_initializer = tf.zeros_initializer()
+
+# Hidden layers weights
+W_hidden_1 = tf.Variable(weight_initializer([n_stocks, n_neurons_1]))
+bias_hidden_1 = tf.Variable(bias_initializer([n_neurons_1]))
+
+print(n_neurons_1)
+print(n_neurons_2)
+
+W_hidden_2 = tf.Variable(weight_initializer([n_neurons_1, n_neurons_2]))
+bias_hidden_2 = tf.Variable(bias_initializer([n_neurons_2]))
+
+W_hidden_3 = tf.Variable(weight_initializer([n_neurons_2, n_neurons_3]))
+bias_hidden_3 = tf.Variable(bias_initializer([n_neurons_3]))
+
+W_hidden_4 = tf.Variable(weight_initializer([n_neurons_3, n_neurons_4]))
+bias_hidden_4 = tf.Variable(bias_initializer([n_neurons_4]))
+
+# Output layer weights
+W_out = tf.Variable(weight_initializer([n_neurons_4, 1]))
+bias_out = tf.Variable(bias_initializer([1]))
+
+# Hidden layer
+hidden_1 = tf.nn.relu(tf.add(tf.matmul(x, W_hidden_1), bias_hidden_1))
+hidden_2 = tf.nn.relu(tf.add(tf.matmul(hidden_1, W_hidden_2), bias_hidden_2))
+hidden_3 = tf.nn.relu(tf.add(tf.matmul(hidden_2, W_hidden_3), bias_hidden_3))
+hidden_4 = tf.nn.relu(tf.add(tf.matmul(hidden_3, W_hidden_4), bias_hidden_4))
+
+# Output layer (transpose!)
+out = tf.transpose(tf.add(tf.matmul(hidden_4, W_out), bias_out))
+
+
+
+
+
+
